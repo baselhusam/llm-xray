@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM X-Ray — Watch an AI think</title>
+    <meta
+      name="description"
+      content="Type a prompt. Watch Qwen3 answer it token by token in real time — attention patterns, per-layer predictions, token probabilities. Share the X-ray."
+    />
+    <meta property="og:title" content="LLM X-Ray — Watch an AI think" />
+    <meta
+      property="og:description"
+      content="Type a prompt. Watch an AI think. Share the X-ray."
+    />
+    <meta property="og:type" content="website" />
+    <style>
+      :root {
+        --bg: #0a0a14;
+        --panel: #12121f;
+        --border: #26263a;
+        --fg: #e8e8f0;
+        --muted: #9a9ab0;
+        --indigo: #818cf8;
+        --indigo-bright: #a5b4fc;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--indigo-bright); }
+      .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+      header {
+        text-align: center;
+        padding: 96px 24px 72px;
+        background: radial-gradient(
+          90% 70% at 50% 0%,
+          rgba(129, 140, 248, 0.18),
+          transparent 70%
+        );
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 12px;
+        color: var(--indigo);
+        margin: 0 0 16px;
+      }
+      h1 {
+        font-size: clamp(40px, 8vw, 72px);
+        line-height: 1.05;
+        margin: 0;
+        font-weight: 800;
+        background: linear-gradient(120deg, #c7d2fe, #818cf8 60%, #6366f1);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .pitch {
+        font-size: clamp(18px, 3vw, 22px);
+        color: var(--muted);
+        margin: 24px auto 36px;
+        max-width: 560px;
+      }
+      .cta {
+        display: inline-flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid var(--border);
+      }
+      .btn-primary {
+        background: var(--indigo);
+        color: #0a0a14;
+        border-color: var(--indigo);
+      }
+      .btn-ghost { color: var(--fg); }
+
+      section { padding: 48px 0; }
+      h2 {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+        margin: 0 0 24px;
+      }
+      .pipeline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .pipeline code {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: var(--indigo-bright);
+        font-size: 13px;
+      }
+      .pipeline .arrow { color: var(--indigo); }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 20px;
+      }
+      .card h3 { margin: 0 0 8px; font-size: 17px; }
+      .card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+      pre {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        overflow-x: auto;
+        font-size: 13px;
+        color: #cdd0e0;
+      }
+      footer {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 56px 24px 72px;
+        border-top: 1px solid var(--border);
+        margin-top: 32px;
+      }
+      .note {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <p class="eyebrow">Qwen3-1.7B · live autoregressive generation</p>
+        <h1>LLM X-Ray</h1>
+        <p class="pitch">Type a prompt. Watch an AI think. Share the X-ray.</p>
+        <div class="cta">
+          <!-- Point this at your deployed app once the frontend is hosted. -->
+          <a class="btn btn-primary" href="#run">Run it locally</a>
+          <a
+            class="btn btn-ghost"
+            href="https://github.com/baselhusam/llmxray"
+            >View on GitHub</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section>
+        <h2>The pipeline</h2>
+        <div class="pipeline">
+          <code>your prompt</code><span class="arrow">→</span>
+          <code>pick a token</code><span class="arrow">→</span>
+          <code>read all 28 layers</code><span class="arrow">→</span>
+          <code>append + repeat</code><span class="arrow">→</span>
+          <code>streamed live</code>
+        </div>
+      </section>
+
+      <section>
+        <h2>What you see</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Architecture flow</h3>
+            <p>
+              The model's actual decoder stack, lit up block by block as each
+              token is generated — click a block for its internal circuit.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Logit-lens trajectory &amp; heatmap</h3>
+            <p>
+              The model's top guesses at every layer — watch the prediction
+              sharpen from noise to a locked-in answer as depth increases.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Attention attribution</h3>
+            <p>
+              Which earlier tokens actually drove a decision, via attention
+              rollout across all layers or a single raw layer.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="run">
+        <h2>Run it locally</h2>
+        <p class="note">
+          The live app needs a running backend (Qwen3-1.7B on CPU) and frontend.
+          The fastest path is Docker:
+        </p>
+        <pre>git clone https://github.com/baselhusam/llmxray
+cd llmxray
+make up          # build + start backend + frontend
+# open http://localhost:3000</pre>
+        <p class="note">
+          First boot downloads the Qwen3-1.7B weights once (~7 GB, cached
+          afterwards). See the repo README for the two-terminal dev setup
+          without Docker.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      LLM X-Ray · Qwen3-1.7B on CPU · built with FastAPI, PyTorch,
+      Next.js &amp; D3
+    </footer>
+  </body>
+</html>
