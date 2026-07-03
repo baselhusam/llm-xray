@@ -6,223 +6,663 @@
     <title>LLM X-Ray — Watch an AI think</title>
     <meta
       name="description"
-      content="Type a prompt. Watch Qwen3 answer it token by token in real time — attention patterns, per-layer predictions, token probabilities. Share the X-ray."
+      content="Type a prompt. Watch Qwen3-1.7B answer it token by token in real time — attention patterns, per-layer logit-lens predictions, token probabilities. Share the X-ray."
     />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <meta property="og:title" content="LLM X-Ray — Watch an AI think" />
     <meta
       property="og:description"
       content="Type a prompt. Watch an AI think. Share the X-ray."
     />
+    <meta property="og:image" content="assets/banner-dark.svg" />
     <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        --bg: #0a0a14;
-        --panel: #12121f;
-        --border: #26263a;
-        --fg: #e8e8f0;
-        --muted: #9a9ab0;
-        --indigo: #818cf8;
-        --indigo-bright: #a5b4fc;
+        --ink: #16181d;
+        --ink-soft: #1b1c1f;
+        --card: #1e2026;
+        --card-2: #202329;
+        --paper: #f1eee7;
+        --muted: #9a958c;
+        --muted-2: #6f6a61;
+        --border: rgba(241, 238, 231, 0.1);
+        --border-2: rgba(241, 238, 231, 0.16);
+        --accent: #f0653b;
+        --accent-deep: #d9542b;
+        --weight: #c8bca4;
+        --conf-low: #6f6a61;
+        --conf-mid: #d99a45;
+        --conf-high: #f0653b;
+        --sans: "Hanken Grotesk", "Segoe UI", Arial, sans-serif;
+        --mono: "Spline Sans Mono", "SFMono-Regular", Menlo, Consolas, monospace;
       }
       * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
       body {
         margin: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-          Helvetica, Arial, sans-serif;
+        background: var(--ink);
+        color: var(--paper);
+        font: 16px/1.6 var(--sans);
         -webkit-font-smoothing: antialiased;
+        background-image:
+          radial-gradient(46rem 30rem at 16% -8rem, rgba(240, 101, 59, 0.1), transparent 70%),
+          linear-gradient(rgba(241, 238, 231, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(241, 238, 231, 0.035) 1px, transparent 1px);
+        background-size: auto, 44px 44px, 44px 44px;
+        background-attachment: fixed, fixed, fixed;
+        background-repeat: no-repeat, repeat, repeat;
       }
-      a { color: var(--indigo-bright); }
-      .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+      a { color: var(--accent); text-decoration-color: transparent; transition: color 0.15s ease, text-decoration-color 0.15s ease; }
+      a:hover:not(.btn) { color: var(--accent); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+      ::selection { background: var(--accent); color: var(--ink); }
 
-      header {
+      .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+      header.hero {
+        position: relative;
+        padding: 0 24px 8px;
         text-align: center;
-        padding: 96px 24px 72px;
-        background: radial-gradient(
-          90% 70% at 50% 0%,
-          rgba(129, 140, 248, 0.18),
-          transparent 70%
-        );
+        overflow: hidden;
+        border-bottom: 1px solid var(--border);
       }
-      .eyebrow {
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        font-size: 12px;
-        color: var(--indigo);
-        margin: 0 0 16px;
+      .hero-glow {
+        position: absolute;
+        inset: 0 -10% auto -10%;
+        height: 620px;
+        background:
+          radial-gradient(52% 62% at 50% 6%, rgba(240, 101, 59, 0.17), transparent 72%),
+          radial-gradient(30% 40% at 50% -4%, rgba(241, 238, 231, 0.05), transparent 70%);
+        pointer-events: none;
+        z-index: 0;
       }
-      h1 {
-        font-size: clamp(40px, 8vw, 72px);
-        line-height: 1.05;
-        margin: 0;
+      .hero-frame {
+        position: relative;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 88px 44px 72px;
+        z-index: 1;
+      }
+      .hero-frame .corner {
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        border: 1.5px solid rgba(241, 238, 231, 0.14);
+      }
+      .hero-frame .corner.tl { top: 20px; left: 0; border-right: none; border-bottom: none; }
+      .hero-frame .corner.tr { top: 20px; right: 0; border-left: none; border-bottom: none; }
+      .hero-frame .corner.bl { bottom: 20px; left: 0; border-right: none; border-top: none; }
+      .hero-frame .corner.br { bottom: 20px; right: 0; border-left: none; border-top: none; }
+      .hero-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+      }
+      .brand-lockup {
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(10px, 2.4vw, 18px);
+        cursor: pointer;
+        border-radius: 10px;
+      }
+      .brand-mark {
+        width: clamp(38px, 9vw, 58px);
+        height: clamp(38px, 9vw, 58px);
+        flex: none;
+        transition: transform 0.3s ease;
+      }
+      .brand-mark .crop-marks { opacity: 0.34; transition: opacity 0.3s ease; }
+      .brand-mark .focal-dot { transition: filter 0.3s ease, r 0.3s ease; }
+      .brand-word {
+        font-family: var(--sans);
         font-weight: 800;
-        background: linear-gradient(120deg, #c7d2fe, #818cf8 60%, #6366f1);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        font-size: clamp(40px, 8vw, 72px);
+        letter-spacing: -0.02em;
+        line-height: 1;
+        color: var(--paper);
+        transition: color 0.3s ease;
       }
+      .brand-word .x-letter { color: var(--accent); transition: color 0.3s ease; }
+      .brand-lockup:hover .brand-mark,
+      .brand-lockup:focus-visible .brand-mark { transform: scale(1.08) rotate(3deg); }
+      .brand-lockup:hover .brand-mark .crop-marks,
+      .brand-lockup:focus-visible .brand-mark .crop-marks { opacity: 0.9; }
+      .brand-lockup:hover .brand-mark .focal-dot,
+      .brand-lockup:focus-visible .brand-mark .focal-dot {
+        r: 4.6;
+        filter: drop-shadow(0 0 8px rgba(240, 101, 59, 0.9));
+      }
+      .brand-lockup:hover .brand-word,
+      .brand-lockup:focus-visible .brand-word { color: var(--accent); }
+      .brand-lockup:hover .brand-word .x-letter,
+      .brand-lockup:focus-visible .brand-word .x-letter { color: var(--paper); }
+      .brand-lockup:focus-visible { outline: 1px solid var(--accent); outline-offset: 10px; }
       .pitch {
-        font-size: clamp(18px, 3vw, 22px);
+        font-size: clamp(17px, 2.6vw, 20px);
         color: var(--muted);
-        margin: 24px auto 36px;
-        max-width: 560px;
+        margin: 0;
+        max-width: 520px;
       }
       .cta {
-        display: inline-flex;
+        display: flex;
         gap: 12px;
         flex-wrap: wrap;
         justify-content: center;
+        margin: 6px 0 0;
       }
       .btn {
         display: inline-block;
-        padding: 12px 24px;
-        border-radius: 10px;
+        padding: 11px 22px;
+        border-radius: 8px;
         font-weight: 600;
-        text-decoration: none;
-        border: 1px solid var(--border);
-      }
-      .btn-primary {
-        background: var(--indigo);
-        color: #0a0a14;
-        border-color: var(--indigo);
-      }
-      .btn-ghost { color: var(--fg); }
-
-      section { padding: 48px 0; }
-      h2 {
         font-size: 14px;
+        text-decoration: none !important;
+        border: 1px solid var(--border-2);
+        transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+      }
+      .btn-primary, .btn-primary:hover {
+        background: var(--accent);
+        color: var(--ink) !important;
+        border-color: var(--accent);
+      }
+      .btn-primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); transform: translateY(-1px); }
+      .btn-ghost, .btn-ghost:hover { color: var(--paper) !important; }
+      .btn-ghost:hover { border-color: var(--accent); background: rgba(240, 101, 59, 0.08); transform: translateY(-1px); }
+
+      section { padding: 56px 0; }
+      .kicker {
+        font-family: var(--mono);
+        font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.14em;
         color: var(--muted);
-        margin: 0 0 24px;
+        margin: 0 0 20px;
       }
+      .kicker .accent-dash { color: var(--accent); }
+
+      /* ---------- instrument preview mockup ---------- */
+      .scope {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px 22px 20px;
+        overflow: hidden;
+      }
+      .scope-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        margin-bottom: 16px;
+      }
+      .scope-top .live { color: var(--accent); }
+      .scope-top .live .dot {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin-right: 6px;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+      .prompt-line {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 14px;
+      }
+      .prompt-line .glyph { color: var(--accent); margin-right: 8px; }
+      .prompt-line .q { color: var(--paper); }
+
+      .think-block {
+        border-left: 2px solid var(--border-2);
+        padding: 2px 0 12px 12px;
+        margin: 0 0 16px;
+      }
+      .think-label {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--muted-2);
+        margin: 0 0 6px;
+      }
+      .think-tokens { font-size: 13px; color: var(--muted-2); line-height: 1.9; }
+      .think-tokens .tok { padding: 1px 1px; }
+
+      .timeline-label {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        margin: 0 0 10px;
+      }
+      .timeline {
+        position: relative;
+        font-size: 16px;
+        line-height: 2.4;
+      }
+      .tok {
+        display: inline-block;
+        padding: 2px 3px;
+        margin-right: 1px;
+        border-bottom: 2px solid var(--tok-c, var(--conf-low));
+        color: var(--paper);
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background 0.15s ease, transform 0.15s ease;
+      }
+      .tok:hover, .tok.hl {
+        background: rgba(240, 101, 59, 0.16);
+        transform: translateY(-1px);
+      }
+      .tok.locked {
+        background: rgba(240, 101, 59, 0.12);
+        border-radius: 5px;
+      }
+      .tok.locked:hover, .tok.locked.hl {
+        background: rgba(240, 101, 59, 0.24);
+      }
+      .tok.caret::after {
+        content: "";
+        display: inline-block;
+        width: 2px;
+        height: 15px;
+        background: var(--accent);
+        margin-left: 3px;
+        transform: translateY(3px);
+        animation: caret 1s steps(1) infinite;
+      }
+
+      .arc-wrap { position: relative; width: 100%; height: 46px; margin: 2px 0 2px; }
+      .arc-wrap svg { width: 100%; height: 100%; display: block; overflow: visible; }
+      .arc-wrap path {
+        transition: stroke-opacity 0.2s ease, stroke-width 0.2s ease;
+      }
+      .arc-wrap path.hl { stroke-opacity: 1 !important; stroke-width: 2.2px !important; }
+      .arc-wrap .arc-node { transition: r 0.2s ease; }
+
+      .traj {
+        margin-top: 18px;
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+      }
+      .traj-rows { display: grid; gap: 7px; }
+      .traj-row {
+        display: grid;
+        grid-template-columns: 46px 1fr 84px;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        cursor: pointer;
+        border-radius: 5px;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      .traj-row:hover, .traj-row.hl { background: rgba(240, 101, 59, 0.08); color: var(--paper); }
+      .traj-row .layer { text-align: right; }
+      .traj-row.locked { color: var(--paper); }
+      .traj-track {
+        height: 6px;
+        border-radius: 4px;
+        background: rgba(241, 238, 231, 0.06);
+        overflow: hidden;
+      }
+      .traj-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: var(--fill-c, var(--conf-low));
+      }
+      .traj-row .guess { text-align: left; }
+      .traj-row.locked .guess { color: var(--accent); }
+
+      .scope-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted-2);
+        letter-spacing: 0.06em;
+      }
+      .legend { display: flex; gap: 14px; align-items: center; }
+      .legend .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; transform: translateY(1px); }
+
+      /* ---------- pipeline ---------- */
+      .pipeline-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        margin: 0 -24px;
+        padding: 4px 24px 6px;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+        mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent-deep) transparent;
+      }
+      .pipeline-scroll::-webkit-scrollbar { height: 5px; }
+      .pipeline-scroll::-webkit-scrollbar-track { background: transparent; }
+      .pipeline-scroll::-webkit-scrollbar-thumb { background: rgba(240, 101, 59, 0.4); border-radius: 9999px; }
       .pipeline {
         display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
+        flex-wrap: nowrap;
+        width: max-content;
+        min-width: 100%;
+        justify-content: safe center;
+        gap: 6px;
         align-items: center;
         color: var(--muted);
-        font-size: 14px;
-      }
-      .pipeline code {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 8px 12px;
-        color: var(--indigo-bright);
         font-size: 13px;
       }
-      .pipeline .arrow { color: var(--indigo); }
+      .pipeline code {
+        flex: none;
+        white-space: nowrap;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 7px 12px;
+        color: var(--paper);
+        font-family: var(--mono);
+        font-size: 12px;
+        transition: border-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+      }
+      .pipeline code:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        transform: translateY(-1px);
+      }
+      .pipeline .arrow { flex: none; color: var(--accent); }
 
+      /* ---------- feature grid ---------- */
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
       }
       .card {
-        background: var(--panel);
+        background: var(--card);
         border: 1px solid var(--border);
         border-radius: 14px;
         padding: 20px;
+        transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
       }
-      .card h3 { margin: 0 0 8px; font-size: 17px; }
-      .card p { margin: 0; color: var(--muted); font-size: 14px; }
+      .card:hover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px -22px rgba(240, 101, 59, 0.45);
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 15.5px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card h3 .n {
+        font-family: var(--mono);
+        color: var(--accent);
+        font-size: 12px;
+        transition: color 0.15s ease;
+      }
+      .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
 
       pre {
-        background: var(--panel);
+        background: var(--card);
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 18px 20px;
         overflow-x: auto;
+        font-family: var(--mono);
         font-size: 13px;
-        color: #cdd0e0;
+        color: var(--paper);
+        line-height: 1.7;
       }
+      pre .c { color: var(--muted-2); }
+      .note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+
       footer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
         text-align: center;
-        color: var(--muted);
-        font-size: 13px;
-        padding: 56px 24px 72px;
+        color: var(--muted-2);
+        font-size: 12.5px;
+        font-family: var(--mono);
+        padding: 72px 24px 80px;
         border-top: 1px solid var(--border);
-        margin-top: 32px;
+        margin-top: 24px;
       }
-      .note {
-        font-size: 13px;
-        color: var(--muted);
-        margin-top: 12px;
+      footer a { color: var(--muted); }
+      footer a:hover { color: var(--accent); }
+      .footer-tagline { margin: 0; letter-spacing: 0.02em; line-height: 1.7; }
+      .footer-link { font-size: 12.5px; letter-spacing: 0.02em; }
+      .footer-mark {
+        display: block;
+        width: 46px;
+        height: 46px;
+        margin: 0;
+        opacity: 0.55;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+      .footer-mark svg { display: block; width: 100%; height: 100%; }
+      .footer-mark .crop-marks { transition: opacity 0.25s ease; opacity: 0.34; }
+      .footer-mark .x-lines { transition: stroke 0.25s ease; }
+      .footer-mark .focal-dot { transition: filter 0.25s ease, r 0.25s ease; }
+      .footer-mark:hover,
+      .footer-mark:focus-visible {
+        opacity: 1;
+        transform: scale(1.12) rotate(3deg);
+        outline: none;
+      }
+      .footer-mark:hover .crop-marks,
+      .footer-mark:focus-visible .crop-marks { opacity: 0.85; }
+      .footer-mark:hover .focal-dot,
+      .footer-mark:focus-visible .focal-dot {
+        r: 4.4;
+        filter: drop-shadow(0 0 7px rgba(240, 101, 59, 0.9));
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+      @keyframes caret {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+      }
+
+      @media (max-width: 560px) {
+        .traj-row { grid-template-columns: 34px 1fr 64px; }
+        .hero-frame { padding: 64px 28px 52px; }
+        .hero-frame .corner { display: none; }
       }
     </style>
   </head>
-  <body>
-    <header>
-      <div class="wrap">
-        <p class="eyebrow">Qwen3-1.7B · live autoregressive generation</p>
-        <h1>LLM X-Ray</h1>
-        <p class="pitch">Type a prompt. Watch an AI think. Share the X-ray.</p>
-        <div class="cta">
-          <!-- Point this at your deployed app once the frontend is hosted. -->
-          <a class="btn btn-primary" href="#run">Run it locally</a>
-          <a
-            class="btn btn-ghost"
-            href="https://github.com/baselhusam/llmxray"
-            >View on GitHub</a
-          >
+  <body id="top">
+    <header class="hero">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="hero-frame">
+        <span class="corner tl" aria-hidden="true"></span>
+        <span class="corner tr" aria-hidden="true"></span>
+        <span class="corner bl" aria-hidden="true"></span>
+        <span class="corner br" aria-hidden="true"></span>
+        <div class="hero-inner">
+          <div class="brand-lockup" tabindex="0">
+            <svg class="brand-mark" viewBox="0 0 64 64" role="img" aria-label="LLM X-Ray mark">
+              <g class="crop-marks" fill="none" stroke="#F1EEE7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="14,22 14,14 22,14"></polyline>
+                <polyline points="50,22 50,14 42,14"></polyline>
+                <polyline points="14,42 14,50 22,50"></polyline>
+                <polyline points="50,42 50,50 42,50"></polyline>
+              </g>
+              <g class="x-lines" stroke="#F1EEE7" stroke-width="5" stroke-linecap="round">
+                <line x1="21" y1="21" x2="43" y2="43"></line>
+                <line x1="43" y1="21" x2="21" y2="43"></line>
+              </g>
+              <circle class="focal-dot" cx="32" cy="32" r="3.6" fill="#F0653B"></circle>
+            </svg>
+            <span class="brand-word">LLM <span class="x-letter">X</span>-Ray</span>
+          </div>
+          <p class="pitch">
+            Every token, every layer, live. Watch attention shift, predictions
+            sharpen, and confidence lock in as the model writes — an MRI for a
+            language model, driven by your own prompt.
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="#run">Run it locally</a>
+            <a class="btn btn-ghost" href="https://github.com/baselhusam/llmxray">View on GitHub</a>
+          </div>
         </div>
       </div>
     </header>
 
     <main class="wrap">
+      <section id="preview">
+        <p class="kicker"><span class="accent-dash">›</span> A look inside the scope</p>
+        <div class="scope">
+          <div class="scope-top">
+            <span class="live"><span class="dot"></span>STREAMING</span>
+            <span>QWEN3-1.7B · 28 LAYERS · CPU</span>
+          </div>
+          <p class="prompt-line"><span class="glyph">&raquo;</span><span class="q">What's the capital of France?</span></p>
+
+          <div class="think-block">
+            <p class="think-label">REASONING</p>
+            <p class="think-tokens">The user is asking a simple factual question about geography. France's capital is well known&hellip;</p>
+          </div>
+
+          <p class="timeline-label">ANSWER · UNDERLINE = CONFIDENCE · HOVER A TOKEN</p>
+          <div class="timeline" id="timeline">
+            <span class="tok" id="tok-0" style="--tok-c:#6f6a61">The</span><span class="tok" id="tok-1" data-arc-to="tok-5" style="--tok-c:#8a7f65">·capital</span><span class="tok" id="tok-2" style="--tok-c:#c98a3f">·of</span><span class="tok" id="tok-3" data-arc-to="tok-5" style="--tok-c:#d99a45">·France</span><span class="tok" id="tok-4" style="--tok-c:#e2822f">·is</span><span class="tok locked" id="tok-5" style="--tok-c:#f0653b">·Paris</span><span class="tok caret" id="tok-6" style="--tok-c:#f0653b">.</span>
+          </div>
+
+          <div class="arc-wrap">
+            <svg id="arc-svg" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <marker id="arrow-head" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="#f0653b"></path>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+
+          <div class="traj">
+            <p class="timeline-label">LOGIT-LENS TRAJECTORY · &ldquo;·Paris&rdquo; · HOVER A LAYER</p>
+            <div class="traj-rows" id="traj-rows">
+              <div class="traj-row" data-arc-to="tok-5">
+                <span class="layer">L0</span>
+                <span class="traj-track"><span class="traj-fill" style="--fill-c:#6f6a61;width:9%"></span></span>
+                <span class="guess">&ldquo;the&rdquo;</span>
+              </div>
+              <div class="traj-row" data-arc-to="tok-5">
+                <span class="layer">L7</span>
+                <span class="traj-track"><span class="traj-fill" style="--fill-c:#8a7f65;width:22%"></span></span>
+                <span class="guess">&ldquo;a&rdquo;</span>
+              </div>
+              <div class="traj-row" data-arc-to="tok-5">
+                <span class="layer">L14</span>
+                <span class="traj-track"><span class="traj-fill" style="--fill-c:#d99a45;width:46%"></span></span>
+                <span class="guess">&ldquo;located&rdquo;</span>
+              </div>
+              <div class="traj-row" data-arc-to="tok-5">
+                <span class="layer">L21</span>
+                <span class="traj-track"><span class="traj-fill" style="--fill-c:#e2822f;width:74%"></span></span>
+                <span class="guess">&ldquo;Paris&rdquo;</span>
+              </div>
+              <div class="traj-row locked" data-arc-to="tok-5">
+                <span class="layer">L27</span>
+                <span class="traj-track"><span class="traj-fill" style="--fill-c:#f0653b;width:96%"></span></span>
+                <span class="guess">&ldquo;Paris&rdquo;</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scope-foot">
+            <span>step 6 / 6 · greedy · 0.13s/token</span>
+            <span class="legend">
+              <span><span class="sw" style="background:#6f6a61"></span>unsure</span>
+              <span><span class="sw" style="background:#d99a45"></span>warming</span>
+              <span><span class="sw" style="background:#f0653b"></span>locked</span>
+            </span>
+          </div>
+        </div>
+        <p class="note">
+          A static rendering of the live instrument — the real thing streams
+          this from an actual forward pass on your prompt, token by token.
+        </p>
+      </section>
+
       <section>
-        <h2>The pipeline</h2>
-        <div class="pipeline">
-          <code>your prompt</code><span class="arrow">→</span>
-          <code>pick a token</code><span class="arrow">→</span>
-          <code>read all 28 layers</code><span class="arrow">→</span>
-          <code>append + repeat</code><span class="arrow">→</span>
-          <code>streamed live</code>
+        <p class="kicker">The pipeline</p>
+        <div class="pipeline-scroll">
+          <div class="pipeline">
+            <code>prompt</code><span class="arrow">→</span>
+            <code>chat template</code><span class="arrow">→</span>
+            <code>prime KV cache</code><span class="arrow">→</span>
+            <code>generate token</code><span class="arrow">→</span>
+            <code>read 28 layers</code><span class="arrow">→</span>
+            <code>stream live</code>
+          </div>
         </div>
       </section>
 
       <section>
-        <h2>What you see</h2>
+        <p class="kicker">What you see</p>
         <div class="grid">
           <div class="card">
-            <h3>Architecture flow</h3>
-            <p>
-              The model's actual decoder stack, lit up block by block as each
-              token is generated — click a block for its internal circuit.
-            </p>
+            <h3><span class="n">01</span>Architecture flow</h3>
+            <p>The model's actual decoder stack, lit up block by block as each token is generated — click a block for its internal circuit (attention → residual → MLP → residual).</p>
           </div>
           <div class="card">
-            <h3>Logit-lens trajectory &amp; heatmap</h3>
-            <p>
-              The model's top guesses at every layer — watch the prediction
-              sharpen from noise to a locked-in answer as depth increases.
-            </p>
+            <h3><span class="n">02</span>Generation timeline</h3>
+            <p>Reasoning and answer tokens as a running transcript, each underlined by confidence. Replay the whole run, scrub with the keyboard, or jump straight to the model's shakiest decisions.</p>
           </div>
           <div class="card">
-            <h3>Attention attribution</h3>
-            <p>
-              Which earlier tokens actually drove a decision, via attention
-              rollout across all layers or a single raw layer.
-            </p>
+            <h3><span class="n">03</span>Logit-lens trajectory &amp; heatmap</h3>
+            <p>The model's best guess read off every layer for the selected token — watch the prediction sharpen from noise to a locked-in answer as depth increases.</p>
+          </div>
+          <div class="card">
+            <h3><span class="n">04</span>Next-token candidates</h3>
+            <p>The real distribution behind the chosen token: what it picked, how sure it was, and the runner-up it almost said instead.</p>
+          </div>
+          <div class="card">
+            <h3><span class="n">05</span>Attention attribution</h3>
+            <p>Which earlier tokens actually drove a decision — attention rollout across all layers, a single raw layer, or arcs drawn straight onto the timeline.</p>
+          </div>
+          <div class="card">
+            <h3><span class="n">06</span>Shareable card</h3>
+            <p>One-click PNG of the current Q&amp;A, branded and watermarked, plus dynamic OG images so shared links unfurl with the prediction.</p>
           </div>
         </div>
       </section>
 
       <section id="run">
-        <h2>Run it locally</h2>
-        <p class="note">
-          The live app needs a running backend (Qwen3-1.7B on CPU) and frontend.
-          The fastest path is Docker:
+        <p class="kicker">Run it locally</p>
+        <p class="note" style="margin-top:0">
+          The live app needs a running backend (Qwen3-1.7B on CPU) and
+          frontend. The fastest path is Docker:
         </p>
-        <pre>git clone https://github.com/baselhusam/llmxray
+        <pre><span class="c"># clone &amp; start</span>
+git clone https://github.com/baselhusam/llmxray
 cd llmxray
-make up          # build + start backend + frontend
-# open http://localhost:3000</pre>
+make up          <span class="c"># build + start backend + frontend</span>
+<span class="c"># open http://localhost:3000</span></pre>
         <p class="note">
-          First boot downloads the Qwen3-1.7B weights once (~7 GB, cached
+          First boot downloads the Qwen3-1.7B weights once (~4 GB, cached
           afterwards). See the repo README for the two-terminal dev setup
           without Docker.
         </p>
@@ -230,8 +670,107 @@ make up          # build + start backend + frontend
     </main>
 
     <footer>
-      LLM X-Ray · Qwen3-1.7B on CPU · built with FastAPI, PyTorch,
-      Next.js &amp; D3
+      <a class="footer-mark" href="#top" aria-label="Back to top">
+        <svg viewBox="0 0 64 64" role="img" aria-label="LLM X-Ray mark">
+          <g class="crop-marks" fill="none" stroke="#F1EEE7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="14,22 14,14 22,14"></polyline>
+            <polyline points="50,22 50,14 42,14"></polyline>
+            <polyline points="14,42 14,50 22,50"></polyline>
+            <polyline points="50,42 50,50 42,50"></polyline>
+          </g>
+          <g class="x-lines" stroke="#F1EEE7" stroke-width="5" stroke-linecap="round">
+            <line x1="21" y1="21" x2="43" y2="43"></line>
+            <line x1="43" y1="21" x2="21" y2="43"></line>
+          </g>
+          <circle class="focal-dot" cx="32" cy="32" r="3.6" fill="#F0653B"></circle>
+        </svg>
+      </a>
+      <p class="footer-tagline">LLM X-Ray · Qwen3-1.7B on CPU · FastAPI + PyTorch + Next.js + D3</p>
+      <a class="footer-link" href="https://github.com/baselhusam/llmxray">github.com/baselhusam/llmxray</a>
     </footer>
+
+    <script>
+      (function () {
+        var svgNS = "http://www.w3.org/2000/svg";
+        var wrap = document.querySelector(".arc-wrap");
+        var svg = document.getElementById("arc-svg");
+        var timeline = document.getElementById("timeline");
+        if (!wrap || !svg || !timeline) return;
+
+        var sources = Array.prototype.slice.call(timeline.querySelectorAll("[data-arc-to]"));
+        var target = document.getElementById("tok-5");
+
+        function drawArcs() {
+          var wrapRect = wrap.getBoundingClientRect();
+          if (!wrapRect.width) return;
+          svg.setAttribute("viewBox", "0 0 " + wrapRect.width + " " + wrapRect.height);
+          Array.prototype.slice.call(svg.querySelectorAll(".arc, .arc-node")).forEach(function (n) { n.remove(); });
+
+          var tRect = target.getBoundingClientRect();
+          var tx = tRect.left + tRect.width / 2 - wrapRect.left;
+
+          sources.forEach(function (el, i) {
+            var r = el.getBoundingClientRect();
+            var sx = r.left + r.width / 2 - wrapRect.left;
+            var dip = wrapRect.height - 8 - i * 12;
+            var path = document.createElementNS(svgNS, "path");
+            var d =
+              "M " + tx + " 4 C " +
+              (tx - (tx - sx) * 0.32) + " " + dip + ", " +
+              (sx + (tx - sx) * 0.32) + " " + dip + ", " +
+              sx + " 4";
+            path.setAttribute("d", d);
+            path.setAttribute("class", "arc");
+            path.setAttribute("data-for", el.id);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "#f0653b");
+            path.setAttribute("stroke-opacity", i === 0 ? "0.85" : "0.5");
+            path.setAttribute("stroke-width", i === 0 ? "1.8" : "1.4");
+            path.setAttribute("marker-end", "url(#arrow-head)");
+            svg.appendChild(path);
+          });
+
+          var dot = document.createElementNS(svgNS, "circle");
+          dot.setAttribute("cx", tx);
+          dot.setAttribute("cy", 4);
+          dot.setAttribute("r", 3);
+          dot.setAttribute("fill", "#f0653b");
+          dot.setAttribute("class", "arc-node");
+          svg.appendChild(dot);
+        }
+
+        function setHighlight(ids) {
+          document.querySelectorAll(".tok").forEach(function (t) {
+            t.classList.toggle("hl", ids.indexOf(t.id) !== -1);
+          });
+          document.querySelectorAll("#arc-svg path.arc").forEach(function (p) {
+            p.classList.toggle("hl", ids.indexOf(p.getAttribute("data-for")) !== -1);
+          });
+        }
+        function clearHighlight() { setHighlight([]); }
+
+        sources.forEach(function (el) {
+          el.addEventListener("mouseenter", function () { setHighlight([el.id, "tok-5"]); });
+          el.addEventListener("mouseleave", clearHighlight);
+        });
+        if (target) {
+          target.addEventListener("mouseenter", function () {
+            setHighlight(sources.map(function (s) { return s.id; }).concat(["tok-5"]));
+          });
+          target.addEventListener("mouseleave", clearHighlight);
+        }
+        document.querySelectorAll("#traj-rows .traj-row[data-arc-to]").forEach(function (row) {
+          row.addEventListener("mouseenter", function () { setHighlight(["tok-5"]); });
+          row.addEventListener("mouseleave", clearHighlight);
+        });
+
+        window.addEventListener("resize", drawArcs);
+        drawArcs();
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(drawArcs);
+        }
+        setTimeout(drawArcs, 350);
+      })();
+    </script>
   </body>
 </html>
