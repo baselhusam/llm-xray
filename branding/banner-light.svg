@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-label="LLM X-Ray — type a prompt, watch an AI think">
+  <defs>
+    <pattern id="scanlines-l" width="1" height="6" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="1" height="1" fill="#1B1C1F" opacity="0.035"></rect>
+    </pattern>
+    <radialGradient id="glow-l" cx="180" cy="160" r="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D9542B" stop-opacity="0.16"></stop>
+      <stop offset="45%" stop-color="#D9542B" stop-opacity="0.06"></stop>
+      <stop offset="100%" stop-color="#D9542B" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="320" fill="#FBFAF6"></rect>
+  <rect width="1280" height="320" fill="url(#scanlines-l)"></rect>
+  <rect width="1280" height="320" fill="url(#glow-l)"></rect>
+
+  <!-- ghost mark, top-right -->
+  <g opacity="0.05" transform="translate(760 -150) scale(8.5)">
+    <g fill="none" stroke="#1B1C1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="14,22 14,14 22,14"></polyline>
+      <polyline points="50,22 50,14 42,14"></polyline>
+      <polyline points="14,42 14,50 22,50"></polyline>
+      <polyline points="50,42 50,50 42,50"></polyline>
+    </g>
+    <g stroke="#1B1C1F" stroke-width="5" stroke-linecap="round">
+      <line x1="21" y1="21" x2="43" y2="43"></line>
+      <line x1="43" y1="21" x2="21" y2="43"></line>
+    </g>
+  </g>
+
+  <!-- frame hairlines -->
+  <line x1="0" y1="0.5" x2="1280" y2="0.5" stroke="#1B1C1F" stroke-opacity="0.08"></line>
+  <line x1="0" y1="319.5" x2="1280" y2="319.5" stroke="#1B1C1F" stroke-opacity="0.08"></line>
+
+  <!-- mark -->
+  <g transform="translate(100 80) scale(2.5)">
+    <g fill="none" stroke="#1B1C1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.34">
+      <polyline points="14,22 14,14 22,14"></polyline>
+      <polyline points="50,22 50,14 42,14"></polyline>
+      <polyline points="14,42 14,50 22,50"></polyline>
+      <polyline points="50,42 50,50 42,50"></polyline>
+    </g>
+    <g stroke="#1B1C1F" stroke-width="5" stroke-linecap="round">
+      <line x1="21" y1="21" x2="43" y2="43"></line>
+      <line x1="43" y1="21" x2="21" y2="43"></line>
+    </g>
+    <circle cx="32" cy="32" r="3.6" fill="#D9542B"></circle>
+  </g>
+
+  <!-- wordmark -->
+  <text x="300" y="178" font-family="'Hanken Grotesk','Segoe UI',Arial,sans-serif" font-weight="700" font-size="80" letter-spacing="-2.2" fill="#1B1C1F">LLM <tspan fill="#D9542B">X</tspan>-Ray</text>
+
+  <!-- tagline -->
+  <text x="302" y="222" font-family="'Hanken Grotesk','Segoe UI',Arial,sans-serif" font-weight="500" font-size="24" letter-spacing="-0.1" fill="#54514A">Type a prompt. Watch an AI think.</text>
+
+  <!-- mono label -->
+  <text x="302" y="257" font-family="'Spline Sans Mono','SFMono-Regular',Menlo,Consolas,monospace" font-weight="500" font-size="13" letter-spacing="3.5" fill="#9A9384">QWEN3 &#183; LIVE FORWARD PASS &#183; ATTENTION + LOGIT LENS</text>
+</svg>

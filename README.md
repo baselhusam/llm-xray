@@ -1,6 +1,10 @@
-# LLM X-Ray
-
-**Type a prompt. Watch an AI think. Share the X-ray.**
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="branding/banner-light.svg">
+    <img alt="LLM X-Ray — type a prompt, watch an AI think" src="branding/banner-light.svg" width="100%">
+  </picture>
+</p>
 
 LLM X-Ray is an interactive web tool that runs your prompt through a small LLM
 (Qwen3-1.7B) with **greedy autoregressive generation** on CPU and streams what
