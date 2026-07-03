@@ -178,37 +178,6 @@ npm run lint         # eslint
 
 ---
 
-## Project layout
-
-```
-backend/
-  app/
-    main.py          FastAPI app + /ws/xray WebSocket + /api health/generate/devices
-    model.py         XRayModel + ModelAdapter — loads the model once (eager attn), device switching
-    xray_engine.py   XRayHookEngine + GenerationSession — KV-cache generation + logit lens (the core)
-    serializer.py    orjson tensor serialization for the WS protocol
-    schemas.py       REST request/response shapes
-frontend/
-  src/
-    app/             Next.js routes (page, layout, api/og OG-card route)
-    components/      XRayApp shell (sidebar: prompt, thinking toggle, device pill, session
-                      history) + D3/instrument views (architecture flow, trajectory,
-                      heatmap, timeline, confidence curve, attention, distribution) + share
-    hooks/           useXRay (WebSocket), useDevices (/api/devices), useMediaQuery
-    lib/             attention/rollout math, tokens, share URLs, protocol types
-```
-
----
-
-## Screenshots & demo
-
-> _Add a screenshot of the architecture flow view and a short demo GIF here._
->
-> - `docs/architecture-flow.png` — the live forward pass hero view
-> - `docs/demo.gif` — a full run, prompt → streamed generation → share card
-
----
-
 ## Why Qwen3-1.7B?
 
 It's small enough to run free on CPU (~0.13s/token), but modern and instruction-tuned
