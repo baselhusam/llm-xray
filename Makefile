@@ -24,13 +24,13 @@ logs: ## Follow logs from both services
 ps: ## Show running services
 	$(COMPOSE) ps
 
-clean: ## Stop the stack and delete volumes (drops the GPT-2 model cache)
+clean: ## Stop the stack and delete volumes (drops the Qwen3-1.7B model cache)
 	$(COMPOSE) down -v
 
 ## --- Local dev (no Docker) ---
 
 dev-backend: ## Run the backend with autoreload (needs backend/.venv)
-	cd backend && .venv/bin/uvicorn app.main:app --reload
+	cd backend && .venv/bin/uvicorn app.main:app --reload --ws websockets-sansio --ws-ping-timeout 30
 
 dev-frontend: ## Run the Next.js dev server
 	cd frontend && npm run dev
