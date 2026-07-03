@@ -17,6 +17,18 @@
 export const WS_URL =
   process.env.NEXT_PUBLIC_XRAY_WS_URL ?? "ws://127.0.0.1:8000/ws/xray";
 
+/** REST base URL, derived from `WS_URL` (ws(s) -> http(s), drop `/ws/xray`). */
+export const API_BASE_URL = WS_URL.replace(/^ws/, "http").replace(/\/ws\/xray\/?$/, "");
+
+/** Inference device. The frontend's CPU/CUDA/MPS pill sends this on each run. */
+export type DeviceName = "cpu" | "cuda" | "mps";
+
+/** `GET /api/devices` — which devices this backend can run on, and which is active. */
+export interface DevicesResponse {
+  available: DeviceName[];
+  current: DeviceName;
+}
+
 /** A logit-lens top-k prediction (also reused for a step's runner-up picks). */
 export interface TopPrediction {
   token: string;
@@ -30,6 +42,10 @@ export interface MetaData {
   /** Whether the model is reasoning (<think>…</think>) before answering. */
   thinking: boolean;
   model_label: string;
+  /** Device this run actually used — may differ from what was requested if it fell back. */
+  device: DeviceName;
+  /** Effective length cap for this run (client override or the engine default). */
+  max_tokens: number;
 }
 
 export interface TokensData {
@@ -91,6 +107,12 @@ export const NUM_LAYERS = 28;
 
 /** Fallback model name for UI/branding (the live value comes from `meta`). */
 export const MODEL_LABEL = "Qwen3-1.7B";
+
+/** Default length cap sent with a run — mirrors the backend's MAX_NEW_TOKENS. */
+export const DEFAULT_MAX_TOKENS = 1024;
+
+/** Highest cap the backend accepts — mirrors MAX_NEW_TOKENS_LIMIT (`xray_engine.py`). */
+export const MAX_TOKENS_LIMIT = 4096;
 
 /** Human-readable copy for each stop reason (for the done banner). */
 export const STOP_REASON_LABEL: Record<string, string> = {

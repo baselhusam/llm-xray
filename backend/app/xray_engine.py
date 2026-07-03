@@ -40,6 +40,9 @@ from app.model import ModelAdapter, XRayModel
 # Reasoning is long, so it gets a bigger cap + budget; the answer alone is short.
 MAX_NEW_TOKENS = 1024  # answer-only (thinking off)
 MAX_NEW_TOKENS_THINKING = 1024  # reasoning trace + answer
+# Hard ceiling on a client-requested max_tokens override (the WS message may
+# carry one); anything above this is rejected before it reaches the engine.
+MAX_NEW_TOKENS_LIMIT = 4096
 MIN_ANSWER_TOKENS = 6  # don't sentence-stop the answer on an early "."
 # Time budgets sized so the 1024-token cap is actually reachable (~0.13s/token
 # on CPU ≈ 135s for a full run); they remain a safety valve, not the usual stop.
@@ -129,7 +132,11 @@ class XRayHookEngine:
         self._xray = model
 
     def generate(
-        self, prompt: str, thinking: bool = True, top_k: int = 5
+        self,
+        prompt: str,
+        thinking: bool = True,
+        top_k: int = 5,
+        max_new_tokens: int | None = None,
     ) -> "GenerationSession":
         """Create a step-wise generation session for ``prompt``.
 
@@ -138,9 +145,12 @@ class XRayHookEngine:
         ``<think>…</think>`` reasoning trace. The session exposes
         :meth:`GenerationSession.prime` (prompt pass → capture + first token) and
         :meth:`GenerationSession.advance` (one more token, or ``None`` at a stop),
-        so each token can be streamed as it lands.
+        so each token can be streamed as it lands. ``max_new_tokens`` overrides
+        the default length cap (``MAX_NEW_TOKENS(_THINKING)``) when given.
         """
-        return GenerationSession(self, prompt, thinking=thinking, top_k=top_k)
+        return GenerationSession(
+            self, prompt, thinking=thinking, top_k=top_k, max_new_tokens=max_new_tokens
+        )
 
     # --- shared internals -------------------------------------------------
 
@@ -230,6 +240,7 @@ class GenerationSession:
         prompt: str,
         thinking: bool = True,
         top_k: int = 5,
+        max_new_tokens: int | None = None,
     ):
         self._engine = engine
         self._xray = engine._xray
@@ -247,7 +258,8 @@ class GenerationSession:
         has_template = getattr(self._tokenizer, "chat_template", None) is not None
         self.thinking = bool(thinking and has_template and self._think_open is not None)
         self._has_template = has_template
-        self.max_new_tokens = MAX_NEW_TOKENS_THINKING if self.thinking else MAX_NEW_TOKENS
+        default_cap = MAX_NEW_TOKENS_THINKING if self.thinking else MAX_NEW_TOKENS
+        self.max_new_tokens = max_new_tokens if max_new_tokens is not None else default_cap
         self._time_budget = (
             GEN_TIME_BUDGET_THINKING_S if self.thinking else GEN_TIME_BUDGET_S
         )

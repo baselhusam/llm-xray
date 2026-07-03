@@ -41,10 +41,10 @@ export function ReplayControls({
             : "Replay the generation (space · ←/→ scrub)"
         }
         className={cn(
-          "rounded px-2 py-0.5 font-mono text-[11px] transition-colors",
+          "cursor-pointer rounded px-2 py-0.5 font-mono text-[11px] transition-colors",
           playing
             ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground",
+            : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
           disabled && "cursor-not-allowed opacity-40",
         )}
       >
@@ -56,7 +56,7 @@ export function ReplayControls({
         disabled={disabled}
         title="Replay speed"
         className={cn(
-          "rounded px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground",
+          "cursor-pointer rounded px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-accent/10 hover:text-foreground",
           disabled && "cursor-not-allowed opacity-40",
         )}
       >

@@ -25,11 +25,15 @@ export function stepAttentionRow(step: StepData, layer: number): number[] {
 /**
  * Attention **rollout** (Abnar & Zuidema, 2020) for the selected step, computed
  * client-side on demand. Composes residual-augmented, renormalized per-layer
- * attention across all layers; the returned last row is each context token's
+ * attention across all layers; the returned row is each context token's
  * influence on the selected generated token. Length = `P + step`.
  *
- * Computing this lazily (only for the selected step) keeps long reasoning traces
- * tractable — a full per-step rollout would be O(L·S³) every token.
+ * Only the *last row* of the L-layer rollout product is ever needed, so it's
+ * tracked as a single row vector walked through the layers in reverse
+ * (`v ← v·A_l`) rather than materializing the full S×S product at each layer.
+ * That's an O(L·S²) walk instead of O(L·S³) matrix-matrix multiplies — the
+ * difference between milliseconds and tens of seconds on a several-hundred-
+ * token reasoning trace, which used to peg the main thread on every scrub.
  */
 export function rolloutRow(
   promptAttention: number[][][],
@@ -42,11 +46,12 @@ export function rolloutRow(
   const S = P + n;
   const L = promptAttention.length;
 
-  // rollout, kept as a flat S×S buffer; start at identity.
-  let rollout = identity(S);
-  const aug = new Array<number>(S * S);
+  const aug = new Float64Array(S * S);
+  let v = new Float64Array(S);
+  let next = new Float64Array(S);
+  v[S - 1] = 1;
 
-  for (let l = 0; l < L; l++) {
+  for (let l = L - 1; l >= 0; l--) {
     // Build this layer's (S×S) causal mean-attention matrix.
     // Rows 0..P-1 from the prompt block; P..S-1 from generated step rows.
     aug.fill(0);
@@ -65,37 +70,25 @@ export function rolloutRow(
     for (let i = 0; i < S; i++) {
       let sum = 0;
       for (let j = 0; j < S; j++) {
-        const v = 0.5 * aug[i * S + j] + (i === j ? 0.5 : 0);
-        aug[i * S + j] = v;
-        sum += v;
+        const val = 0.5 * aug[i * S + j] + (i === j ? 0.5 : 0);
+        aug[i * S + j] = val;
+        sum += val;
       }
       if (sum > 0) for (let j = 0; j < S; j++) aug[i * S + j] /= sum;
     }
-    rollout = matMul(aug, rollout, S);
-  }
-
-  // Last row = influence of every context token on the most recent position.
-  return rollout.slice((S - 1) * S, S * S);
-}
-
-function identity(S: number): number[] {
-  const m = new Array<number>(S * S).fill(0);
-  for (let i = 0; i < S; i++) m[i * S + i] = 1;
-  return m;
-}
-
-function matMul(a: number[], b: number[], S: number): number[] {
-  const out = new Array<number>(S * S).fill(0);
-  for (let i = 0; i < S; i++) {
-    for (let k = 0; k < S; k++) {
-      const aik = a[i * S + k];
-      if (aik === 0) continue;
-      const bk = k * S;
-      const oi = i * S;
-      for (let j = 0; j < S; j++) out[oi + j] += aik * b[bk + j];
+    // v ← v·aug (row-vector × matrix): the next layer's contribution to the
+    // one row we care about.
+    next.fill(0);
+    for (let i = 0; i < S; i++) {
+      const vi = v[i];
+      if (vi === 0) continue;
+      const base = i * S;
+      for (let j = 0; j < S; j++) next[j] += vi * aug[base + j];
     }
+    [v, next] = [next, v];
   }
-  return out;
+
+  return Array.from(v);
 }
 
 /** The context tokens a step attended over: prompt + earlier generated tokens. */

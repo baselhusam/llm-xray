@@ -17,3 +17,13 @@ const STRUCTURAL = new Set(["<think>", "</think>"]);
 export function isStructuralToken(token: string): boolean {
   return STRUCTURAL.has(token.trim());
 }
+
+/**
+ * True when a token carries actual content — at least one letter or digit.
+ * Whitespace/punctuation-only tokens (",", ".", "\n", " —") behave like
+ * secondary attention sinks in generated text, so attribution views that
+ * pick "the tokens that drove this one" skip them.
+ */
+export function isContentToken(token: string): boolean {
+  return /\p{L}|\p{N}/u.test(token);
+}

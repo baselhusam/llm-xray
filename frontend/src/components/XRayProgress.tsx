@@ -10,22 +10,22 @@
 
 import { Progress, ProgressLabel } from "@/components/ui/progress";
 import type { XRayStatus } from "@/hooks/useXRay";
-
-/**
- * Soft ceiling for the progress bar — matches the backend's MAX_NEW_TOKENS /
- * MAX_NEW_TOKENS_THINKING (`xray_engine.py`), which are both 1024. Most runs
- * stop well before this (sentence-end/EOS), so the bar rarely fills — that's
- * expected for a soft ceiling, not a bug.
- */
-const TOKEN_CAP = 1024;
+import { DEFAULT_MAX_TOKENS } from "@/lib/xray-protocol";
 
 interface XRayProgressProps {
   status: XRayStatus;
   /** Number of tokens generated so far. */
   done: number;
+  /**
+   * The run's length cap (`meta.max_tokens`) — a soft ceiling: most runs stop
+   * well before it (sentence-end/EOS), so the bar rarely fills. Falls back to
+   * the default cap until `meta` lands.
+   */
+  cap?: number;
 }
 
-export function XRayProgress({ status, done }: XRayProgressProps) {
+export function XRayProgress({ status, done, cap }: XRayProgressProps) {
+  const tokenCap = cap ?? DEFAULT_MAX_TOKENS;
   const message =
     status === "connecting"
       ? "Connecting to the model…"
@@ -35,8 +35,8 @@ export function XRayProgress({ status, done }: XRayProgressProps) {
 
   return (
     <Progress
-      value={Math.min(done, TOKEN_CAP)}
-      max={TOKEN_CAP}
+      value={Math.min(done, tokenCap)}
+      max={tokenCap}
       className="flex-col items-stretch gap-2"
     >
       <div className="flex items-baseline justify-between gap-2">

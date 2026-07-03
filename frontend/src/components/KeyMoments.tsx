@@ -33,11 +33,11 @@ export function KeyMoments({ moments, selectedStep, onSelect }: KeyMomentsProps)
           aria-pressed={m.step === selectedStep}
           title={`step ${m.step} · chose ${pct(m.chosenProb)} over ${pct(m.runnerUpProb)}`}
           className={cn(
-            "rounded-full border px-2.5 py-0.5 font-mono text-[11px] transition-colors",
+            "cursor-pointer rounded-full border px-2.5 py-0.5 font-mono text-[11px] transition-colors duration-150",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
             m.step === selectedStep
               ? "border-accent/60 bg-accent/15 text-foreground"
-              : "border-border bg-muted/30 text-muted-foreground hover:border-accent/40 hover:text-foreground",
+              : "border-border bg-muted/30 text-muted-foreground hover:border-accent/40 hover:bg-accent/10 hover:text-foreground",
           )}
         >
           <span className="whitespace-pre text-foreground">{displayToken(m.chosen)}</span>

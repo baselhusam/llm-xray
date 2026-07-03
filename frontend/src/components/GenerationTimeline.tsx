@@ -12,12 +12,13 @@
  * Reasoning tokens (`<think>…</think>`) group into a dimmed block topped by an
  * entropy sparkline (spikes = hesitation mid-reasoning; click to jump there).
  * Attention arcs are drawn *over* the text from the selected token back to the
- * generated tokens that drove it (plus one muted arc for the prompt's share).
+ * generated tokens that drove it (raw attention at the focused layer).
  * Hovering any chip highlights the same token in every other view; clicking a
- * chip rewinds every view to that decision. A caret blinks while streaming.
+ * chip rewinds every view to that decision (clicking it again unpins). A caret
+ * blinks while streaming.
  */
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { firstLockLayer } from "@/lib/steps";
 import { displayToken, isStructuralToken } from "@/lib/tokens";
@@ -45,11 +46,15 @@ interface GenerationTimelineProps {
   onHoverToken: (token: string | null) => void;
   /** Arcs from the selected token back into the generation (weights ∈ [0,1]). */
   arcs: TimelineArc[];
-  /** Share of content attention going back to the prompt, in [0,1]. */
-  promptWeight: number;
 }
 
-function TokenChip({
+/**
+ * Memoized so a long trace (hundreds of chips) doesn't re-render every chip on
+ * every streamed token — only the (at most two) chips whose `active`/`hovered`
+ * status actually changed re-render. `step` keeps a stable identity once
+ * appended (see `useXRay`'s reducer), so this comparison is cheap and correct.
+ */
+const TokenChip = memo(function TokenChip({
   step,
   active,
   hovered,
@@ -57,7 +62,7 @@ function TokenChip({
   numLayers,
   onSelect,
   onHover,
-  chipRef,
+  registerChip,
 }: {
   step: StepData;
   active: boolean;
@@ -66,7 +71,7 @@ function TokenChip({
   numLayers: number;
   onSelect: (s: number) => void;
   onHover: (token: string | null) => void;
-  chipRef: (el: HTMLButtonElement | null) => void;
+  registerChip: (step: number, el: HTMLButtonElement | null) => void;
 }) {
   if (isStructuralToken(step.token)) return null;
   const lock = firstLockLayer(step, numLayers);
@@ -74,7 +79,7 @@ function TokenChip({
     colorMode === "depth" ? depthColor(lock, numLayers) : confidenceColor(step.prob);
   return (
     <button
-      ref={chipRef}
+      ref={(el) => registerChip(step.step, el)}
       type="button"
       onClick={() => onSelect(step.step)}
       onMouseEnter={() => onHover(step.token)}
@@ -82,23 +87,30 @@ function TokenChip({
       aria-pressed={active}
       title={`step ${step.step} · ${step.phase} · chosen ${pct(step.prob)} · entropy ${step.entropy.toFixed(2)} nats · locked at L${lock}`}
       className={cn(
-        "relative -mx-px whitespace-pre rounded px-0.5 transition-colors",
+        "relative -mx-px cursor-pointer whitespace-pre rounded px-0.5",
+        "transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        active ? "bg-primary/30 text-foreground" : "text-foreground/90 hover:bg-muted/60",
-        hovered && !active && "bg-accent/15",
+        // Direct hover gets the strong treatment (CSS :hover); the cross-view
+        // same-token echo (`hovered`) is a soft tint only, so hovering "the"
+        // doesn't flash rings across dozens of chips.
+        active
+          ? "bg-primary/35 text-foreground"
+          : "text-foreground/90 hover:bg-accent/20",
+        hovered && !active && "bg-accent/10",
       )}
-      // The underline and the hover ring are both box-shadows, so they must
-      // live in one inline value (a Tailwind ring class would be overridden).
+      // The certainty/depth underline and the pinned ring are both box-shadows,
+      // so they must live in one inline value (a Tailwind ring class would be
+      // overridden by the inline style).
       style={{
         boxShadow: `inset 0 -2.5px 0 0 ${underline}${
-          hovered ? ", 0 0 0 1px rgba(240,101,59,0.55)" : ""
+          active ? ", 0 0 0 1px rgba(240,101,59,0.6)" : ""
         }`,
       }}
     >
       {displayToken(step.token)}
     </button>
   );
-}
+});
 
 /**
  * Entropy across the reasoning trace — the model's "heartbeat" while it
@@ -162,29 +174,25 @@ function EntropySparkline({
 
 /**
  * Curved attention arcs drawn over the wrapped text: selected chip → the
- * generated tokens that drove it (vermilion), plus one muted parchment arc to
- * the prompt line for the prompt's aggregate share. Chip positions come from
+ * generated tokens that drove it (vermilion). Chip positions come from
  * live DOM measurement, re-taken on layout/resize, so the arcs survive
- * word-wrap.
+ * word-wrap. Arcs fade in (see `arc-fade` in globals.css) keyed on the
+ * source step, so scrubbing swaps them smoothly instead of popping.
  */
 function ArcOverlay({
   containerRef,
   chips,
-  promptRef,
   sourceStep,
   arcs,
-  promptWeight,
   layoutKey,
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   chips: React.RefObject<Map<number, HTMLButtonElement>>;
-  promptRef: React.RefObject<HTMLParagraphElement | null>;
   sourceStep: number;
   arcs: TimelineArc[];
-  promptWeight: number;
   layoutKey: string;
 }) {
-  const [paths, setPaths] = useState<{ d: string; t: number; accent: boolean }[]>([]);
+  const [paths, setPaths] = useState<{ d: string; t: number }[]>([]);
   const [resizeTick, setResizeTick] = useState(0);
 
   useLayoutEffect(() => {
@@ -206,20 +214,8 @@ function ArcOverlay({
     const s = src.getBoundingClientRect();
     const sx = s.left + s.width / 2 - c.left;
     const sy = s.top - c.top + 1;
-    const out: { d: string; t: number; accent: boolean }[] = [];
+    const out: { d: string; t: number }[] = [];
 
-    const q = promptRef.current;
-    if (q && promptWeight > 0.02) {
-      const r = q.getBoundingClientRect();
-      const tx = r.left + Math.min(r.width / 2, 200) - c.left;
-      const ty = r.bottom - c.top;
-      const my = Math.min(sy, ty) - 14 - 22 * promptWeight;
-      out.push({
-        d: `M ${sx} ${sy} Q ${(sx + tx) / 2} ${my} ${tx} ${ty}`,
-        t: promptWeight,
-        accent: false,
-      });
-    }
     for (const a of arcs) {
       if (a.step === sourceStep) continue;
       const target = chips.current?.get(a.step);
@@ -231,21 +227,21 @@ function ArcOverlay({
       out.push({
         d: `M ${sx} ${sy} Q ${(sx + tx) / 2} ${my} ${tx} ${ty}`,
         t: a.w,
-        accent: true,
       });
     }
     setPaths(out);
-  }, [containerRef, chips, promptRef, sourceStep, arcs, promptWeight, resizeTick, layoutKey]);
+  }, [containerRef, chips, sourceStep, arcs, resizeTick, layoutKey]);
 
   if (paths.length === 0) return null;
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden>
       {paths.map((p, i) => (
         <path
-          key={i}
+          key={`${sourceStep}-${i}`}
           d={p.d}
+          className="arc-fade"
           fill="none"
-          stroke={p.accent ? VIZ.accent : VIZ.weight}
+          stroke={VIZ.accent}
           strokeWidth={0.75 + 2.25 * p.t}
           strokeOpacity={0.18 + 0.5 * p.t}
           strokeLinecap="round"
@@ -266,15 +262,15 @@ export function GenerationTimeline({
   hoveredToken,
   onHoverToken,
   arcs,
-  promptWeight,
 }: GenerationTimelineProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const promptRef = useRef<HTMLParagraphElement | null>(null);
   const chipsRef = useRef(new Map<number, HTMLButtonElement>());
-  const registerChip = (step: number) => (el: HTMLButtonElement | null) => {
+  // Stable identity — passed as a prop into the memoized `TokenChip`, so
+  // rebuilding it every render would defeat the memoization.
+  const registerChip = useCallback((step: number, el: HTMLButtonElement | null) => {
     if (el) chipsRef.current.set(step, el);
     else chipsRef.current.delete(step);
-  };
+  }, []);
 
   const think = steps.filter((s) => s.phase === "think");
   const answer = steps.filter((s) => s.phase === "answer");
@@ -292,13 +288,13 @@ export function GenerationTimeline({
       numLayers={numLayers}
       onSelect={onSelect}
       onHover={onHoverToken}
-      chipRef={registerChip(s.step)}
+      registerChip={registerChip}
     />
   );
 
   return (
     <div ref={containerRef} className="relative flex flex-col gap-3">
-      <p ref={promptRef} className="font-mono text-[13px] text-muted-foreground/70">
+      <p className="font-mono text-[13px] text-muted-foreground/70">
         <span className="text-muted-foreground/50">Q&nbsp;</span>
         {promptText}
       </p>
@@ -332,10 +328,8 @@ export function GenerationTimeline({
       <ArcOverlay
         containerRef={containerRef}
         chips={chipsRef}
-        promptRef={promptRef}
         sourceStep={selectedStep}
         arcs={arcs}
-        promptWeight={promptWeight}
         layoutKey={`${steps.length}-${colorMode}`}
       />
     </div>

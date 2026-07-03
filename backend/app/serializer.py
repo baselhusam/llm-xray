@@ -54,7 +54,9 @@ def error_message(message: str) -> str:
 # shapes together.
 
 
-def meta_message(capture: PromptCapture, model_label: str) -> str:
+def meta_message(
+    capture: PromptCapture, model_label: str, device: str, max_tokens: int
+) -> str:
     """Architecture facts the frontend uses as the source of truth for sizing."""
     return _dumps(
         {
@@ -64,6 +66,12 @@ def meta_message(capture: PromptCapture, model_label: str) -> str:
                 "num_heads": capture.num_heads,
                 "thinking": capture.thinking,
                 "model_label": model_label,
+                # The device actually used — may differ from what the client
+                # requested if it fell back (e.g. cuda/mps unavailable).
+                "device": device,
+                # The effective length cap for this run (client override or the
+                # engine default); the frontend progress bar tracks against it.
+                "max_tokens": max_tokens,
             },
         }
     )

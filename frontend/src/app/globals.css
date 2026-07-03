@@ -181,6 +181,11 @@
     animation: xray-pulse 1.6s ease-in-out infinite;
   }
 
+  /* Attention arcs fade in when the selected token changes (keyed remount). */
+  .arc-fade {
+    animation: arc-in 220ms ease-out;
+  }
+
   /* Slim, themed scrollbar for the layer rail. */
   .thin-scroll {
     scrollbar-width: thin;
@@ -192,6 +197,15 @@
   .thin-scroll::-webkit-scrollbar-thumb {
     background: color-mix(in oklch, var(--primary) 40%, transparent);
     border-radius: 9999px;
+  }
+}
+
+@keyframes arc-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

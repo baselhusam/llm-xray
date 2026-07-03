@@ -7,12 +7,13 @@
 </p>
 
 LLM X-Ray is an interactive web tool that runs your prompt through a small LLM
-(Qwen3-1.7B) with **greedy autoregressive generation** on CPU and streams what
-happens inside, token by token — attention patterns, per-layer logit-lens
-predictions, and token probabilities — as live, animated graphics. The model
-answers your question (with an optional `<think>…</think>` reasoning trace
-first), so you watch it actually think, not just autocomplete. Think MRI scan,
-but for a language model. Every run produces a shareable card.
+(Qwen3-1.7B) with **greedy autoregressive generation** — on CPU, Apple-silicon
+GPU (MPS), or CUDA, switchable from the UI — and streams what happens inside,
+token by token: attention patterns, per-layer logit-lens predictions, and token
+probabilities, as live, animated graphics. The model answers your question
+(with an optional `<think>…</think>` reasoning trace first), so you watch it
+actually think, not just autocomplete. Think MRI scan, but for a language
+model. Every run produces a shareable card.
 
 > No pre-baked demos: the visuals are driven by **your** prompt, captured from a live
 > PyTorch forward pass and streamed to the browser token by token.
@@ -28,8 +29,8 @@ but for a language model. Every run produces a shareable card.
 | **Logit-lens trajectory** | The model's best next-token guess read off *every* layer for the selected token — watch the prediction sharpen from noise in early layers to a locked-in answer at the top. |
 | **Logit-lens heatmap** | Layers × candidate tokens, cell brightness = probability — watch probability mass concentrate with depth. |
 | **Next-token candidates** | The real distribution behind the chosen token: what it picked, how sure it was, and the runner-up it almost said instead. |
-| **Attention attribution** | Which earlier tokens actually drove a decision, via attention rollout (honest, cross-layer) or raw per-layer attention. |
-| **Shareable card** | One-click PNG of the current Q&A (branded) + dynamic OG images so shared links unfurl with the prediction. |
+| **Attention attribution** | Which earlier tokens actually drove a decision, via attention rollout (honest, cross-layer) or raw per-layer attention. The timeline also draws attention arcs from the selected token back to the generated tokens that most influenced it. |
+| **Shareable card** | One-click PNG of the run's findings — the per-token confidence curve (reasoning region shaded), run stats, and the hardest decision the model faced — branded and ready to post. |
 
 ---
 
@@ -39,9 +40,10 @@ Two apps, streaming between them over a WebSocket:
 
 ```
 ┌─────────────────────────────┐         WebSocket          ┌──────────────────────────────┐
-│  frontend/  (Next.js 16)     │  ── prompt + thinking ───▶ │  backend/  (FastAPI)          │
+│  frontend/  (Next.js 16)     │  ─ prompt+thinking+device ▶│  backend/  (FastAPI)          │
 │                              │                            │                               │
-│  useXRay hook ─▶ XRayApp     │  ◀── meta ─────────────────│  XRayModel (Qwen3-1.7B, CPU)  │
+│  useXRay hook ─▶ XRayApp     │  ◀── meta ─────────────────│  XRayModel (Qwen3-1.7B,       │
+│                              │                            │    cpu / mps / cuda)          │
 │       │                      │  ◀── tokens ────────────── │  GenerationSession            │
 │       ▼                      │  ◀── prompt_attention ──── │   ├ chat-template + <think>    │
 │  D3 views (architecture flow │  ◀── step × N (per token) ─│   ├ KV-cache autoregressive    │
@@ -74,10 +76,13 @@ back to raw continuation). Tensors are detached to CPU numpy and serialized with
 
 ### WebSocket protocol
 
-Endpoint `/ws/xray`. Client sends `{"prompt": "...", "thinking": bool}` (or a bare
-string; thinking defaults on). The server streams, in order:
+Endpoint `/ws/xray`. Client sends `{"prompt": "...", "thinking": bool, "device": "cpu"|"mps"|"cuda", "max_tokens": int}`
+(or a bare string; thinking defaults on, device is optional — the model moves to the
+requested device before the run, falling back to `cpu` if it isn't available;
+`max_tokens` caps the generation length, default 1024, accepted range 1–4096). The
+server streams, in order:
 
-1. `{"type": "meta", "data": {"num_layers", "num_heads", "thinking", "model_label"}}`
+1. `{"type": "meta", "data": {"num_layers", "num_heads", "thinking", "model_label", "device", "max_tokens"}}` — `device` is what the run *actually* used; `max_tokens` is the effective length cap
 2. `{"type": "tokens", "data": {"tokens", "token_ids"}}` — the chat-templated prompt tokens
 3. `{"type": "prompt_attention", "data": {"attention"}}` — `(layers, P, P)`, mean over heads
 4. one `{"type": "step", "data": {"step", "token", "token_id", "prob", "entropy", "phase", "trajectory", "attention_row"}}` **per generated token**
@@ -85,19 +90,26 @@ string; thinking defaults on). The server streams, in order:
 
 An out-of-band `{"type": "error", "data": {"message"}}` can replace the stream at any point.
 
+REST alongside the socket: `GET /api/health` (liveness + model status) and
+`GET /api/devices` → `{"available": ["cpu", "mps"], "current": "mps"}` — the frontend's
+CPU/MPS/CUDA pill in the sidebar is populated from this (it hides itself when only
+`cpu` is available).
+
 ---
 
 ## Tech stack
 
-- **Backend** — FastAPI · PyTorch · HuggingFace Transformers (Qwen3-1.7B, 2.03B params, 28 layers, 16 query heads, CPU) · orjson · Python 3.11
+- **Backend** — FastAPI · PyTorch · HuggingFace Transformers (Qwen3-1.7B, 2.03B params, 28 layers, 16 query heads; CPU / MPS / CUDA, switchable at runtime) · orjson · Python 3.11
 - **Frontend** — Next.js 16 (App Router, TS, `src/`) · Tailwind v4 · Framer Motion · shadcn/ui · D3.js
 - **Sharing** — html-to-image (client PNG) · `next/og` (server OG cards)
 
-Qwen3-1.7B on CPU is a deliberate choice — it runs free on a small box, understands
+Qwen3-1.7B is a deliberate choice — it runs free on a small box, understands
 and answers real questions (with an optional reasoning trace), and per-token latency
-stays around ~0.13s (a full thinking run is ~15–25s). The engine is model-agnostic,
-so swapping `MODEL_NAME` to something smaller (e.g. `Qwen/Qwen3-0.6B-Base`) or back to
-`gpt2` works with no engine changes.
+stays around ~0.13s on CPU (a full thinking run is ~15–25s). On a Mac, flip the
+sidebar's device pill to **MPS** to run the same pass on the Apple-silicon GPU;
+with an NVIDIA card, **CUDA** appears too. `XRAY_DEVICE` sets the startup default.
+The engine is model-agnostic, so swapping `MODEL_NAME` to something smaller
+(e.g. `Qwen/Qwen3-0.6B-Base`) or back to `gpt2` works with no engine changes.
 
 ---
 
@@ -110,10 +122,17 @@ You'll need **Python 3.11** and **Node 18+**. Run the two apps in separate termi
 ```bash
 cd backend
 .venv/bin/pip install -r requirements.txt   # first run only (downloads torch + Qwen3-1.7B)
-.venv/bin/uvicorn app.main:app --reload      # add --port N if 8000 is taken
+.venv/bin/uvicorn app.main:app --reload --ws websockets-sansio --ws-ping-timeout 30
+# add --port N if 8000 is taken
 ```
 
 Health check: `curl http://127.0.0.1:8000/api/health` → `{"status":"healthy","model_loaded":true}`
+
+> `--ws websockets-sansio --ws-ping-timeout 30` avoids a keepalive-ping crash
+> (`AssertionError` in `websockets/legacy/protocol.py`) that the legacy WS
+> implementation hits when a sustained generation run starves the event loop of
+> CPU time. See `XRAY_TORCH_THREADS`/`XRAY_DEVICE` below for the other half of
+> the fix (leaving the event loop CPU headroom in the first place).
 
 > The Qwen3-1.7B weights (~7 GB in float32) download from HuggingFace on first model
 > load and are cached afterward, so the first startup is slower than the rest.
@@ -137,6 +156,8 @@ Both default to localhost, so no env file is needed for local dev. Override per-
 | `NEXT_PUBLIC_XRAY_WS_URL` | frontend | `ws://127.0.0.1:8000/ws/xray` | backend WebSocket endpoint |
 | `NEXT_PUBLIC_SITE_URL` | frontend | `http://localhost:3000` | absolute URLs for share links + OG images |
 | `CORS_ALLOW_ORIGINS` | backend | `http://localhost:3000,http://127.0.0.1:3000` | comma-separated origins allowed to hit the API/WS |
+| `XRAY_DEVICE` | backend | `cpu` | `cpu` / `mps` / `cuda` — falls back to `cpu` with a log warning if the requested device isn't available |
+| `XRAY_TORCH_THREADS` | backend | torch's auto-detected default minus 2 | pins PyTorch's intra-op thread count; lower it further if the event loop still starves under load |
 
 If you run the backend on a non-default port, set `NEXT_PUBLIC_XRAY_WS_URL` to match.
 
@@ -148,7 +169,7 @@ npm run build        # production build
 npm run lint         # eslint
 
 # backend
-.venv/bin/uvicorn app.main:app --reload
+.venv/bin/uvicorn app.main:app --reload --ws websockets-sansio --ws-ping-timeout 30
 ```
 
 ---
@@ -158,17 +179,18 @@ npm run lint         # eslint
 ```
 backend/
   app/
-    main.py          FastAPI app + /ws/xray WebSocket + /api health/generate
-    model.py         XRayModel + ModelAdapter — loads the model once (eager attn)
+    main.py          FastAPI app + /ws/xray WebSocket + /api health/generate/devices
+    model.py         XRayModel + ModelAdapter — loads the model once (eager attn), device switching
     xray_engine.py   XRayHookEngine + GenerationSession — KV-cache generation + logit lens (the core)
     serializer.py    orjson tensor serialization for the WS protocol
     schemas.py       REST request/response shapes
 frontend/
   src/
     app/             Next.js routes (page, layout, api/og OG-card route)
-    components/      XRayApp shell + D3/instrument views (architecture flow, trajectory,
+    components/      XRayApp shell (sidebar: prompt, thinking toggle, device pill, session
+                      history) + D3/instrument views (architecture flow, trajectory,
                       heatmap, timeline, confidence curve, attention, distribution) + share
-    hooks/           useXRay (WebSocket), useMediaQuery
+    hooks/           useXRay (WebSocket), useDevices (/api/devices), useMediaQuery
     lib/             attention/rollout math, tokens, share URLs, protocol types
 ```
 

@@ -79,18 +79,16 @@ interface LockupProps {
   sublabel?: string;
 }
 
-/** Horizontal lockup: mark + wordmark (+ optional mono sub-label). */
+/** Horizontal lockup: the bare crosshair mark + wordmark (+ optional mono sub-label). */
 export function Lockup({
   className,
-  markClassName = "size-9",
+  markClassName = "size-10",
   wordClassName = "text-sm",
   sublabel,
 }: LockupProps) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <span className="flex shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 p-1.5 text-foreground">
-        <XRayMark className={markClassName} />
-      </span>
+      <XRayMark className={cn("shrink-0 text-foreground", markClassName)} />
       <div className="flex min-w-0 flex-col leading-tight">
         <Wordmark className={wordClassName} />
         {sublabel && (

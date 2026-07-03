@@ -13,7 +13,7 @@
  * state and layout.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { AppSidebar } from "@/components/AppSidebar";
@@ -40,17 +40,20 @@ import { StepDistribution } from "@/components/StepDistribution";
 import { ViewTabs, type XRayView } from "@/components/ViewTabs";
 import { VizSkeleton } from "@/components/VizSkeleton";
 import { XRayProgress } from "@/components/XRayProgress";
+import { useDevices } from "@/hooks/useDevices";
 import { useMediaQuery, DESKTOP_QUERY } from "@/hooks/useMediaQuery";
 import { useXRay } from "@/hooks/useXRay";
-import { contextTokens, isAttnSink, rolloutRow, stepAttentionRow } from "@/lib/attention";
+import { contextTokens, rolloutRow, stepAttentionRow } from "@/lib/attention";
 import { firstLockLayer, keyMoments } from "@/lib/steps";
 import { cn } from "@/lib/utils";
-import { displayToken, isStructuralToken } from "@/lib/tokens";
+import { displayToken, isContentToken, isStructuralToken } from "@/lib/tokens";
 import { pct } from "@/lib/viz";
 import {
+  DEFAULT_MAX_TOKENS,
   MODEL_LABEL,
   NUM_LAYERS,
   STOP_REASON_LABEL,
+  type DeviceName,
   type TopPrediction,
 } from "@/lib/xray-protocol";
 
@@ -111,8 +114,21 @@ function Panel({
 export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
   const xray = useXRay();
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
+  const devices = useDevices();
 
   const [thinking, setThinking] = useState(true);
+  const [maxTokens, setMaxTokens] = useState(DEFAULT_MAX_TOKENS);
+  const [device, setDevice] = useState<DeviceName>("cpu");
+  // Seed the pill from whatever the backend auto-selected (cuda > mps > cpu)
+  // once `/api/devices` resolves — but only once, so it doesn't clobber a
+  // choice the user already made while the fetch was in flight.
+  const deviceSeeded = useRef(false);
+  useEffect(() => {
+    if (devices.current && !deviceSeeded.current) {
+      deviceSeeded.current = true;
+      setDevice(devices.current);
+    }
+  }, [devices]);
   const [pinnedStep, setPinnedStep] = useState<number | null>(null);
   // null = auto-follow the first-lock layer; a number = a layer the user pinned.
   const [layerPinned, setLayerPinned] = useState<number | null>(null);
@@ -135,7 +151,7 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
     setPlaying(false);
     setHoveredToken(null);
     setHistory((h) => [prompt, ...h.filter((p) => p !== prompt)].slice(0, HISTORY_CAP));
-    xray.run(prompt, thinking);
+    xray.run(prompt, thinking, device, maxTokens);
   };
 
   // Clicking a layer pins it; clicking the already-active one returns to auto.
@@ -163,11 +179,39 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
   const current = hasGen ? steps[selectedStep] : null;
 
   // Scrubbing by hand (chip / curve / key-moment click / arrow keys) always
-  // interrupts an in-flight replay.
-  const scrubTo = (step: number) => {
+  // interrupts an in-flight replay. Stable identity (useCallback) so it
+  // doesn't defeat memoization on the hundreds of chips that receive it.
+  const scrubTo = useCallback((step: number) => {
     setPlaying(false);
     setPinnedStep(step);
-  };
+  }, []);
+
+  // Timeline chips toggle: clicking the already-pinned token unpins it
+  // (back to auto-follow), clicking any other pins that one. KeyMoments /
+  // ConfidenceCurve / sparkline keep plain `scrubTo` — jumping is their job.
+  const toggleStep = useCallback((step: number) => {
+    setPlaying(false);
+    setPinnedStep((p) => (p === step ? null : step));
+  }, []);
+
+  // Clicking anywhere that doesn't operate on the pinned token deselects it
+  // entirely (arcs and highlights included). The surfaces that legitimately
+  // explore the pinned token — the generation spine, the instrument panels,
+  // the architecture flow — are marked `data-keep-pin`; everything else
+  // (canvas whitespace, header, answer, sidebar, page margin) clears the pin.
+  // Only listens while something is pinned.
+  useEffect(() => {
+    if (pinnedStep === null) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (!el?.closest("[data-keep-pin]")) {
+        setPlaying(false);
+        setPinnedStep(null);
+      }
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    return () => window.removeEventListener("mousedown", onPointerDown);
+  }, [pinnedStep]);
 
   const togglePlay = () => {
     if (!hasGen || busy) return;
@@ -218,6 +262,9 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
         setPlaying(false);
         const next = ctx.selectedStep + (e.key === "ArrowLeft" ? -1 : 1);
         setPinnedStep(Math.max(0, Math.min(ctx.lastStep, next)));
+      } else if (e.key === "Escape") {
+        setPlaying(false);
+        setPinnedStep(null);
       } else if (e.key === " ") {
         // Let space keep activating a focused button.
         if (t instanceof HTMLElement && t.closest("button")) return;
@@ -253,12 +300,17 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
 
   // Rollout is O(L·S³); compute it lazily for the selected step, and skip the
   // heavy work while the unpinned head is still streaming (it changes every tick).
+  // Deliberately NOT keyed on `steps.length`/`steps` identity: once a step is
+  // pinned, `selectedStep` alone determines the result (its context is fixed),
+  // so re-running this on every later token that streams in — an O(L·S³) pass
+  // over hundreds of tokens, tens of times a second — would peg the main thread
+  // and freeze the UI for the rest of a long reasoning trace.
   const rollout = useMemo(() => {
     if (attnMode !== "rollout" || !current || !xray.promptAttention) return null;
     if (busy && pinnedStep === null) return null;
     return rolloutRow(xray.promptAttention, steps, selectedStep);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attnMode, current, xray.promptAttention, selectedStep, busy, pinnedStep, steps.length]);
+  }, [attnMode, current, xray.promptAttention, selectedStep, busy, pinnedStep]);
 
   const rawWeights = useMemo(
     () => (current ? stepAttentionRow(current, effLayer) : []),
@@ -274,14 +326,19 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
 
   // Attention arcs over the timeline: the selected token's strongest influences
   // among *generated* tokens (context indices P+j ↔ steps[j]), weights
-  // normalized to the strongest target.
+  // normalized to the strongest target. Deliberately fed from the RAW attention
+  // row at the effective layer — never rollout, whose Π(0.5A+0.5I) product
+  // mathematically piles mass onto the earliest positions and made every arc
+  // point at the first few reasoning tokens regardless of content. Punctuation/
+  // whitespace-only tokens are skipped too (secondary sinks, no meaning).
   const timelineArcs = useMemo<TimelineArc[]>(() => {
     if (!current) return [];
     const gen: { step: number; w: number }[] = [];
     for (let j = 0; j < selectedStep; j++) {
-      const w = attnWeights[P + j];
+      const w = rawWeights[P + j];
       if (w === undefined) break;
-      if (isStructuralToken(steps[j].token)) continue;
+      const tok = steps[j].token;
+      if (isStructuralToken(tok) || !isContentToken(tok)) continue;
       gen.push({ step: steps[j].step, w });
     }
     let max = 0;
@@ -292,23 +349,7 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
       .sort((a, b) => b.w - a.w)
       .slice(0, 5)
       .map((g) => ({ step: g.step, w: g.w / max }));
-  }, [current, attnWeights, P, selectedStep, steps]);
-
-  // The prompt's share of content attention (sink/scaffolding excluded) —
-  // drawn as one aggregate arc back to the question line.
-  const promptShare = useMemo(() => {
-    if (!current || attnWeights.length === 0) return 0;
-    let prompt = 0;
-    let gen = 0;
-    const S = Math.min(ctxTokens.length, attnWeights.length);
-    for (let i = 0; i < S; i++) {
-      if (isAttnSink(ctxTokens[i], i)) continue;
-      if (i < P) prompt += attnWeights[i];
-      else gen += attnWeights[i];
-    }
-    const total = prompt + gen;
-    return total > 0 ? prompt / total : 0;
-  }, [current, attnWeights, ctxTokens, P]);
+  }, [current, rawWeights, P, selectedStep, steps]);
 
   const showViz = hasGen || busy;
 
@@ -455,6 +496,11 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
           initialPrompt={initialPrompt}
           thinking={thinking}
           onToggleThinking={() => setThinking((t) => !t)}
+          maxTokens={maxTokens}
+          onMaxTokensChange={setMaxTokens}
+          device={device}
+          availableDevices={devices.available}
+          onDeviceChange={setDevice}
           onSubmit={handleSubmit}
           history={history}
           onPickHistory={handleSubmit}
@@ -527,7 +573,11 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
           <AnimatePresence>
             {busy && (
               <motion.div key="progress" {...fadeUp}>
-                <XRayProgress status={xray.status} done={steps.length} />
+                <XRayProgress
+                  status={xray.status}
+                  done={steps.length}
+                  cap={xray.meta?.max_tokens}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -537,6 +587,7 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
             <motion.section
               key="spine"
               {...fadeUp}
+              data-keep-pin
               className="surface-panel flex flex-col gap-4 rounded-xl border border-border/60 p-4 sm:p-5"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -591,14 +642,13 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
                 promptText={xray.prompt}
                 steps={steps}
                 selectedStep={selectedStep}
-                onSelect={scrubTo}
+                onSelect={toggleStep}
                 streaming={busy}
                 colorMode={colorMode}
                 numLayers={numLayers}
                 hoveredToken={hoveredToken}
                 onHoverToken={setHoveredToken}
                 arcs={timelineArcs}
-                promptWeight={promptShare}
               />
               {hasGen && (
                 <div className="border-t border-border/50 pt-3">
@@ -610,7 +660,7 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
 
           {/* Architecture hero — the model's topology with the live pass flowing through it */}
           {showViz && (
-            <motion.div key="architecture" {...fadeUp}>
+            <motion.div key="architecture" {...fadeUp} data-keep-pin>
               <Panel
                 hero
                 title="Architecture · live forward pass"
@@ -643,7 +693,7 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
           {/* Instrument views */}
           {showViz &&
             (isDesktop ? (
-              <motion.div key="viz-desktop" {...fadeUp} className="flex flex-col gap-5">
+              <motion.div key="viz-desktop" {...fadeUp} data-keep-pin className="flex flex-col gap-5">
                 <div className="grid items-start gap-5 lg:grid-cols-2">
                   <Panel
                     hero
@@ -669,7 +719,7 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
                 </Panel>
               </motion.div>
             ) : (
-              <motion.div key="viz-mobile" {...fadeUp} className="flex flex-col gap-3">
+              <motion.div key="viz-mobile" {...fadeUp} data-keep-pin className="flex flex-col gap-3">
                 <ViewTabs value={view} onChange={setView} />
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -735,10 +785,8 @@ export function XRayApp({ initialPrompt }: { initialPrompt?: string }) {
               <ShareSection
                 prompt={xray.prompt}
                 modelLabel={modelLabel}
-                generatedText={(answerText.trim() || xray.done.generated_text).slice(0, 320)}
-                finalToken={steps[lastStep].token}
-                finalProb={steps[lastStep].prob}
-                runnerUp={runnerUp}
+                answerText={(answerText.trim() || xray.done.generated_text).slice(0, 320)}
+                steps={steps}
               />
             </motion.div>
           )}
