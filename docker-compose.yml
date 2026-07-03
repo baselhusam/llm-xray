@@ -1,0 +1,49 @@
+# LLM X-Ray — full local stack: Qwen3-1.7B backend (WebSocket) + Next.js frontend.
+#   make up      # build + run both
+#   make logs    # follow logs
+#   make down    # stop
+services:
+  backend:
+    build:
+      context: ./backend
+    image: llmxray-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Origins allowed to hit the API/WS (comma-separated).
+      CORS_ALLOW_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+    volumes:
+      # Persist the Qwen3-1.7B weights (~7GB, float32) downloaded on first boot.
+      - hf-cache:/cache/huggingface
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Generous: the first boot downloads ~7GB of Qwen3-1.7B weights before the
+      # server is healthy, which can take several minutes on a slow connection.
+      start_period: 600s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser connects to these, so they point at the published host
+        # ports (not the compose service names). Baked in at build time.
+        NEXT_PUBLIC_XRAY_WS_URL: "ws://127.0.0.1:8000/ws/xray"
+        NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+    image: llmxray-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  hf-cache:
