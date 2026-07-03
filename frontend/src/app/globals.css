@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-hanken);
+  --font-mono: var(--font-spline);
+  --font-heading: var(--font-hanken);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * LLM X-Ray theme — the brand identity system: ink & paper with a single warm
+ * vermilion accent ("Signal"). The product is a precision instrument, not a toy,
+ * so the surface reads clinical — near-black ink, warm paper text, a faint scan
+ * grid — and exactly one living accent marks what the instrument is looking at.
+ * Resist a second accent; the restraint is the brand. Dark is the default
+ * (brand "on dark"); the accent warms one step brighter there (#F0653B) for
+ * equal presence. Hex values are taken straight from the brand guidelines.
+ */
+:root {
+  --background: #f4f1ea; /* paper */
+  --foreground: #1b1c1f; /* ink */
+  --card: #fbfaf6; /* paper raised */
+  --card-foreground: #1b1c1f;
+  --popover: #fbfaf6;
+  --popover-foreground: #1b1c1f;
+  --primary: #d9542b; /* vermilion — Signal, on light */
+  --primary-foreground: #fff4ef;
+  --secondary: #ece7dc;
+  --secondary-foreground: #1b1c1f;
+  --muted: #ece7dc;
+  --muted-foreground: #54514a;
+  --accent: #d9542b;
+  --accent-foreground: #fff4ef;
+  --destructive: #c23b3b;
+  --border: rgba(20, 20, 20, 0.1);
+  --input: rgba(20, 20, 20, 0.12);
+  --ring: #d9542b;
+  --chart-1: #d9542b;
+  --chart-2: #b9ad97;
+  --chart-3: #8a857c;
+  --chart-4: #54514a;
+  --chart-5: #1b1c1f;
+  --radius: 0.8rem;
+  --sidebar: #fbfaf6;
+  --sidebar-foreground: #1b1c1f;
+  --sidebar-primary: #d9542b;
+  --sidebar-primary-foreground: #fff4ef;
+  --sidebar-accent: #ece7dc;
+  --sidebar-accent-foreground: #1b1c1f;
+  --sidebar-border: rgba(20, 20, 20, 0.1);
+  --sidebar-ring: #d9542b;
+}
+
+.dark {
+  --background: #16181d; /* ink */
+  --foreground: #f1eee7; /* paper text on dark */
+  --card: #1e2026; /* raised ink */
+  --card-foreground: #f1eee7;
+  --popover: #1b1c1f;
+  --popover-foreground: #f1eee7;
+  --primary: #f0653b; /* vermilion — one step brighter on dark */
+  --primary-foreground: #1b1c1f; /* ink knockout — crisp on the bright accent */
+  --secondary: #24262c;
+  --secondary-foreground: #f1eee7;
+  --muted: #24262c;
+  --muted-foreground: #9a958c; /* muted mono */
+  --accent: #f0653b;
+  --accent-foreground: #1b1c1f;
+  --destructive: #e5645a;
+  --border: rgba(241, 238, 231, 0.1);
+  --input: rgba(241, 238, 231, 0.14);
+  --ring: #f0653b;
+  --chart-1: #f0653b;
+  --chart-2: #c8bca4;
+  --chart-3: #9a958c;
+  --chart-4: #6f6a61;
+  --chart-5: #f1eee7;
+  --sidebar: #1b1c1f;
+  --sidebar-foreground: #f1eee7;
+  --sidebar-primary: #f0653b;
+  --sidebar-primary-foreground: #1b1c1f;
+  --sidebar-accent: #24262c;
+  --sidebar-accent-foreground: #f1eee7;
+  --sidebar-border: rgba(241, 238, 231, 0.1);
+  --sidebar-ring: #f0653b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* A whisper-faint vermilion wash plus a fixed "scan bed" grid — the language
+       of a scanner / viewfinder from the brand. Both kept very low-contrast so
+       the dashboard reads calm and clinical, never "glowy". */
+    background-image:
+      radial-gradient(46rem 30rem at 16% -8rem, color-mix(in oklch, var(--primary) 9%, transparent), transparent 70%),
+      linear-gradient(color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px);
+    background-size:
+      auto,
+      44px 44px,
+      44px 44px;
+    background-attachment: fixed;
+    background-repeat: no-repeat, repeat, repeat;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  /* A whisper-soft vermilion edge for the answer surface — restrained, no halo. */
+  .glow-primary {
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--primary) 16%, transparent),
+      0 18px 50px -34px color-mix(in oklch, var(--primary) 50%, transparent);
+  }
+
+  /* Hairline gradient frame used on the hero panel — subtle, top-lit. */
+  .panel-ring {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--card), var(--card)) padding-box,
+      linear-gradient(160deg, color-mix(in oklch, var(--primary) 28%, transparent), color-mix(in oklch, var(--border) 100%, transparent) 38%) border-box;
+  }
+
+  /* Sidebar surface — a touch deeper than the canvas so the shell reads as a tool. */
+  .surface-sidebar {
+    background: color-mix(in oklch, var(--card) 55%, transparent);
+  }
+
+  /* Generic elevated panel surface for the canvas. */
+  .surface-panel {
+    background: color-mix(in oklch, var(--card) 45%, transparent);
+  }
+
+  /* A small live indicator dot. */
+  .pulse-dot {
+    animation: xray-pulse 1.6s ease-in-out infinite;
+  }
+
+  /* Slim, themed scrollbar for the layer rail. */
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--primary) 40%, transparent) transparent;
+  }
+  .thin-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--primary) 40%, transparent);
+    border-radius: 9999px;
+  }
+}
+
+@keyframes xray-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 60%, transparent);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--accent) 0%, transparent);
+  }
+}
+
+::selection {
+  background: color-mix(in oklch, var(--primary) 40%, transparent);
+}
