@@ -1,6 +1,9 @@
 # OS
 .DS_Store
 
+# Screen.studio recording projects (source of videos/*.gif; too big for git)
+*.screenstudio
+
 # Python (backend)
 backend/.venv/
 __pycache__/

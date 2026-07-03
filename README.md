@@ -18,6 +18,10 @@ model. Every run produces a shareable card.
 > No pre-baked demos: the visuals are driven by **your** prompt, captured from a live
 > PyTorch forward pass and streamed to the browser token by token.
 
+<p align="center">
+  <img src="videos/DEMOVIDEO.gif" alt="LLM X-Ray in action — a prompt streaming through Qwen3-1.7B with live attention, logit-lens, and confidence views" width="100%">
+</p>
+
 ---
 
 ## What you see
