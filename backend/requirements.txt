@@ -1,0 +1,15 @@
+# Web layer (installed for M0)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+orjson>=3.10.0
+
+# Inference layer (installed in M1 — heavy; torch is a large download)
+transformers>=4.51.0  # >=4.51 ships Qwen3 support
+torch>=2.5.0
+numpy>=2.0.0
+
+# Card generation (M7)
+Pillow>=11.0.0
+
+# Tests (engine regression suite in tests/; runs against the real cached model)
+pytest>=8.0.0
